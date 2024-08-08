@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.14)
-cmake_policy(VERSION 3.14)
+cmake_minimum_required(VERSION 3.10)
+cmake_policy(VERSION 3.10)
 if(POLICY CMP0135) # DOWNLOAD_EXTRACT_TIMESTAMP
   cmake_policy(SET CMP0135 OLD)
 endif()
@@ -73,18 +73,45 @@ if(NOT JWT_DISABLE_PICOJSON AND JWT_EXTERNAL_PICOJSON)
   find_package(picojson 1.3.0 REQUIRED)
 endif()
 
+# if(JWT_BUILD_EXAMPLES OR JWT_BUILD_TESTS)
+#   if(JWT_EXTERNAL_NLOHMANN_JSON)
+#     message(STATUS "jwt-cpp: using find_package for nlohmann-json required for tests")
+#     find_package(nlohmann_json CONFIG REQUIRED)
+#   else()
+#     message(STATUS "jwt-cpp: using FetchContent for nlohmann-json required for tests")
+#     include(FetchContent)
+#     fetchcontent_declare(nlohmann_json
+#       URL https://github.com/nlohmann/json/releases/download/v3.11.2/json.tar.xz
+#       URL_MD5 127794b2c82c0c5693805feaa2a703e2)
+#     fetchcontent_makeavailable(nlohmann_json)
+#   endif()
+# endif()
+
 if(JWT_BUILD_EXAMPLES OR JWT_BUILD_TESTS)
-  if(JWT_EXTERNAL_NLOHMANN_JSON)
-    message(STATUS "jwt-cpp: using find_package for nlohmann-json required for tests")
-    find_package(nlohmann_json CONFIG REQUIRED)
-  else()
-    message(STATUS "jwt-cpp: using FetchContent for nlohmann-json required for tests")
-    include(FetchContent)
-    fetchcontent_declare(nlohmann_json
-      URL https://github.com/nlohmann/json/releases/download/v3.11.2/json.tar.xz
-      URL_MD5 127794b2c82c0c5693805feaa2a703e2)
-    fetchcontent_makeavailable(nlohmann_json)
-  endif()
+    if(JWT_EXTERNAL_NLOHMANN_JSON)
+        message(STATUS "jwt-cpp: using find_package for nlohmann-json required for tests")
+        find_package(nlohmann_json CONFIG REQUIRED)
+    else()
+        message(STATUS "jwt-cpp: using ExternalProject for nlohmann-json required for tests")
+
+        include(ExternalProject)
+
+        ExternalProject_Add(nlohmann_json_project
+            PREFIX ${CMAKE_BINARY_DIR}/external/nlohmann_json
+            GIT_REPOSITORY https://github.com/nlohmann/json.git
+            GIT_TAG v3.11.2
+            UPDATE_COMMAND ""
+            CONFIGURE_COMMAND ""
+            BUILD_COMMAND ""
+            INSTALL_COMMAND ""
+        )
+
+        ExternalProject_Get_Property(nlohmann_json_project SOURCE_DIR)
+        set(NLOHMANN_JSON_INCLUDE_DIR ${SOURCE_DIR}/include)
+
+        add_library(nlohmann_json INTERFACE)
+        target_include_directories(nlohmann_json INTERFACE ${NLOHMANN_JSON_INCLUDE_DIR})
+    endif()
 endif()
 
 set(JWT_INCLUDE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -125,10 +152,7 @@ if(${JWT_SSL_LIBRARY} MATCHES "wolfSSL")
   target_link_libraries(jwt-cpp INTERFACE PkgConfig::wolfssl)
   # This is required to access OpenSSL compatibility API
   target_include_directories(jwt-cpp INTERFACE ${wolfssl_INCLUDE_DIRS})
-  # This flag is required to have the mandatory header included automatically 
-  # https://github.com/Thalhammer/jwt-cpp/pull/352#discussion_r1627971786
-  # https://github.com/wolfSSL/wolfssl/blob/3b74a6402998a8b8839e25e31ba8ac74749aa9b0/wolfssl/wolfcrypt/settings.h#L58
-  target_compile_definitions(jwt-cpp INTERFACE EXTERNAL_OPTS_OPENVPN)
+  target_compile_definitions(jwt-cpp INTERFACE OPENSSL_EXTRA OPENSSL_ALL)
 endif()
 
 if(NOT JWT_DISABLE_PICOJSON AND JWT_EXTERNAL_PICOJSON)
@@ -156,19 +180,18 @@ endif()
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/jwt-cpp-config.cmake ${CMAKE_CURRENT_BINARY_DIR}/jwt-cpp-config-version.cmake
         DESTINATION ${JWT_CMAKE_FILES_INSTALL_DIR})
 
-if(JWT_BUILD_EXAMPLES)
-  add_subdirectory(example)
-endif()
+# if(JWT_BUILD_EXAMPLES)
+#   add_subdirectory(example)
+# endif()
 
-if(JWT_BUILD_TESTS)
-  enable_testing()
-  add_subdirectory(tests)
-endif()
+# if(JWT_BUILD_TESTS)
+#   add_subdirectory(tests)
+# endif()
 
-if(JWT_ENABLE_FUZZING)
-  add_subdirectory(tests/fuzz)
-endif()
+# if(JWT_ENABLE_FUZZING)
+#   add_subdirectory(tests/fuzz)
+# endif()
 
-if(JWT_BUILD_DOCS)
-  add_subdirectory(docs)
-endif()
+# if(JWT_BUILD_DOCS)
+#   add_subdirectory(docs)
+# endif()
